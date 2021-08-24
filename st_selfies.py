@@ -63,7 +63,7 @@ while i!=0:
 
     if i==0:
       final=braketoff(SELFIES)
-      st.title('SELFIES 😎')
+      st.title('SELFIES 😎 (BETA)')
       st.write(SELFIES)
       for f in final:
         chain+='['+f+']'
