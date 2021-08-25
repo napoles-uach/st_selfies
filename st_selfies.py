@@ -26,8 +26,6 @@ def braketoff(lista):
   return new_list
 
 
-
-
 i=1
 key=0
 
