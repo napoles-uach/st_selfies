@@ -12,10 +12,10 @@ X3={'[F]':['F',0],'[=O]':['=O',0],'[#N]':['#N',0] ,'[O]':['O',1] ,'[N]':['N',2] 
 X4={'[F]':['F',0],'[=O]':['=O',0],'[#N]':['#N',0] ,'[O]':['O',1] ,'[N]':['N',2] ,'[=N]':['=N',1] ,'[C]':['C',3] ,'[=C]':['=C',2] ,'[#C]':['#C',1] }
 
 X=[X0,X1,X2,X3,X4]
-#lista=['[F]','[=O]','[#N]']
+
 chain=''
 
-#st.write(chain)
+
 
 
 def braketoff(lista):
@@ -28,11 +28,6 @@ def braketoff(lista):
   return new_list
 
 
-
-  
-  
-  
-#st.write(n_l)
 
 
 i=1
@@ -51,15 +46,12 @@ i=1
 while i!=0:
     key+=1
 
-    #st.title(i)
+
     dic=X[i]    
     init=st.sidebar.selectbox('token:'+str(key),dic,key=str(key))
 
     SELFIES.append(init)
     i=int(dic[init][1])
-
-
-
 
     if i==0:
       final=braketoff(SELFIES)
