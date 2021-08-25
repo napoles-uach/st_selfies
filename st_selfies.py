@@ -16,8 +16,6 @@ X=[X0,X1,X2,X3,X4]
 chain=''
 
 
-
-
 def braketoff(lista):
   new_list=[]
   for el in lista:
