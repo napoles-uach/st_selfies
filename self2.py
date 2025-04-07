@@ -4,10 +4,16 @@ from rdkit import Chem
 from rdkit.Chem import Draw
 from PIL import Image
 
-# Obtener todos los tokens válidos de SELFIES
-tokens = sf.get_semantic_robust_alphabet()
+# 1. Generar el alfabeto SELFIES extendido a partir de ejemplos aromáticos
+ejemplos_smiles = [
+    "Cn1cnc2c1c(=O)n(c(=O)n2C)C",  # Cafeína
+    "c1ccncc1",                    # Piridina
+    "c1ccccc1",                    # Benceno
+    "C1=CC=CN=C1",                 # Piridina isómera
+]
+tokens = sf.get_alphabet_from_selfies([sf.encoder(s) for s in ejemplos_smiles])
 
-# Estimar valencias por token (muy simplificado)
+# 2. Estimar valencias para los tokens
 valencia_por_token = {
     '[C]': 4, '[=C]': 4, '[#C]': 4, '[c]': 3,
     '[N]': 3, '[=N]': 3, '[#N]': 3, '[n]': 3,
@@ -19,36 +25,36 @@ valencia_por_token = {
     '[Ring1]': 0, '[Ring2]': 0, '[Ring3]': 0,
     '[Expl=Ring1]': 0, '[Expl=Ring2]': 0,
     '[Expl#Ring1]': 0, '[Expl#Ring2]': 0,
-    '[nop]': 0, '[=nop]': 0  # no-op tokens
+    '[nop]': 0, '[=nop]': 0
 }
 
-# Generar estados X0 a X4 basados en valencia restante
+# 3. Construir diccionarios de estado (X0 a X4)
 X = [{} for _ in range(5)]
 for token in tokens:
-    val = valencia_por_token.get(token, 1)  # si no se reconoce, se le da 1
+    val = valencia_por_token.get(token, 1)  # Asumimos 1 si no está en el diccionario
     for state in range(5):
         new_state = max(state + val - 4, 0)
         X[state][token] = [token.strip('[]'), new_state]
 
-# Inicializar estado
+# 4. Inicializar estado de Streamlit
 if "tokens" not in st.session_state:
     st.session_state.tokens = []
 if "state" not in st.session_state:
     st.session_state.state = 0
 
-st.title("🧬 SELFIES Builder - Compatible con moléculas complejas")
+st.title("☕ SELFIES Builder extendido – ¡Listo para cafeína!")
 
-# Diccionario según estado actual
+# Diccionario del estado actual
 current_dict = X[st.session_state.state]
 
-# Si estamos en el primer paso, filtramos ciclos y ramas
+# Al iniciar, no permitir ciclos ni ramas
 if len(st.session_state.tokens) == 0:
     current_dict = {k: v for k, v in current_dict.items() if 'Branch' not in k and 'Ring' not in k}
 
 # Selección de token
-selected = st.selectbox("Selecciona el siguiente token", current_dict.keys())
+selected = st.selectbox("Selecciona el siguiente token", sorted(current_dict.keys()))
 
-# Agregar token
+# Botón para agregar token
 if st.button("Agregar token"):
     st.session_state.tokens.append(selected)
     st.session_state.state = int(current_dict[selected][1])
@@ -56,11 +62,10 @@ if st.button("Agregar token"):
 # Mostrar SELFIES actual
 if st.session_state.tokens:
     st.subheader("📋 SELFIES actual")
-    st.code("".join(st.session_state.tokens))
-
     chain = "".join(st.session_state.tokens)
+    st.code(chain)
 
-    # Mostrar molécula si el estado es 0
+    # Mostrar SMILES y estructura si el estado es 0
     if st.session_state.state == 0:
         try:
             smiles = sf.decoder(chain)
@@ -73,6 +78,6 @@ if st.session_state.tokens:
             st.error("❌ Error al decodificar la cadena SELFIES.")
 
 # Botón de reinicio
-if st.button("🔄 Reiniciar"):
+if st.button("🔄 Reiniciar construcción"):
     st.session_state.tokens = []
     st.session_state.state = 0
