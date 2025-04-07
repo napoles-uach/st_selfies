@@ -5,10 +5,10 @@ from rdkit import Chem
 from rdkit.Chem import Draw
 from PIL import Image
 
-# Cargar archivo CSV con la tabla de derivación
-df = pd.read_csv('selfies_table.csv')
+# Cargar la tabla extendida
+df = pd.read_csv('selfies_table_extended_with_branches_and_rings.csv')
 
-# Construir diccionarios por estado
+# Diccionarios por estado
 X_dict = {
     state: {
         row['symbol']: [row['smiles'], int(row['next_state'])]
@@ -17,25 +17,19 @@ X_dict = {
     for state, group in df.groupby('state')
 }
 
-# Lista de estados en orden
 states = ['X0', 'X1', 'X2', 'X3', 'X4']
 
-# Función para quitar corchetes
 def remove_brackets(tokens):
     return [tok.replace('[', '').replace(']', '') for tok in tokens]
 
-# Inicialización
 SELFIES = []
 chain = ''
 key = 0
 state_index = 0
 
-# Primer token desde X0
 dic = X_dict[states[state_index]]
 selected = st.sidebar.selectbox(f'token: {key}', dic, key=str(key))
 SELFIES.append(selected)
-
-# Construcción de cadena SELFIES
 next_state = int(dic[selected][1])
 
 while next_state != 0:
@@ -43,9 +37,24 @@ while next_state != 0:
     dic = X_dict[states[next_state]]
     selected = st.sidebar.selectbox(f'token: {key}', dic, key=str(key))
     SELFIES.append(selected)
-    next_state = int(dic[selected][1])
 
-# Mostrar resultados
+    # 🔀 Manejo de ramas
+    if 'Branch' in selected:
+        Q = int(selected.replace('[Branch', '').replace(']', ''))
+        branch_state = states[next_state]
+        st.sidebar.markdown(f'**→ Dentro de rama de longitud {Q}**')
+        for q in range(Q):
+            key += 1
+            branch_dic = X_dict[branch_state]
+            branch_token = st.sidebar.selectbox(f'branch_token: {key}', branch_dic, key=str(key))
+            SELFIES.append(branch_token)
+            branch_state = states[int(branch_dic[branch_token][1])]
+        next_state = int(dic[selected][1])  # continúa después de la rama
+
+    else:
+        next_state = int(dic[selected][1])
+
+# Visualización
 final_tokens = remove_brackets(SELFIES)
 st.title('st_SELFIES 😎 (BETA)')
 st.write(SELFIES)
