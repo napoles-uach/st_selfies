@@ -4,68 +4,60 @@ from rdkit import Chem
 from rdkit.Chem import Draw
 from PIL import Image
 
-# Diccionarios de transición por estado de valencia
-X0 = {'[F]': ['F', 1], '[=O]': ['O', 2], '[#N]': ['N', 3], '[O]': ['O', 2],
-      '[N]': ['N', 3], '[=N]': ['N', 3], '[C]': ['C', 4], '[=C]': ['C', 4], '[#C]': ['C', 4]}
-X1 = {'[F]': ['F', 0], '[=O]': ['O', 0], '[#N]': ['N', 0], '[O]': ['O', 1],
-      '[N]': ['N', 2], '[=N]': ['N', 2], '[C]': ['C', 3], '[=C]': ['C', 3], '[#C]': ['C', 3]}
-X2 = {'[F]': ['F', 0], '[=O]': ['=O', 0], '[#N]': ['=N', 0], '[O]': ['O', 1],
-      '[N]': ['N', 2], '[=N]': ['=N', 2], '[C]': ['C', 3], '[=C]': ['=C', 2], '[#C]': ['=C', 2]}
-X3 = {'[F]': ['F', 0], '[=O]': ['=O', 0], '[#N]': ['#N', 0], '[O]': ['O', 1],
-      '[N]': ['N', 2], '[=N]': ['=N', 1], '[C]': ['C', 3], '[=C]': ['=C', 2], '[#C]': ['#C', 1]}
-X4 = {'[F]': ['F', 0], '[=O]': ['=O', 0], '[#N]': ['#N', 0], '[O]': ['O', 1],
-      '[N]': ['N', 2], '[=N]': ['=N', 1], '[C]': ['C', 3], '[=C]': ['=C', 2], '[#C]': ['#C', 1]}
+# Diccionarios de tokens válidos según la valencia restante
+X = [
+    {'[F]': ['F', 1], '[=O]': ['O', 2], '[#N]': ['N', 3], '[O]': ['O', 2],
+     '[N]': ['N', 3], '[=N]': ['N', 3], '[C]': ['C', 4], '[=C]': ['C', 4], '[#C]': ['C', 4]},
+    
+    {'[F]': ['F', 0], '[=O]': ['O', 0], '[#N]': ['N', 0], '[O]': ['O', 1],
+     '[N]': ['N', 2], '[=N]': ['N', 2], '[C]': ['C', 3], '[=C]': ['C', 3], '[#C]': ['C', 3]},
+    
+    {'[F]': ['F', 0], '[=O]': ['=O', 0], '[#N]': ['=N', 0], '[O]': ['O', 1],
+     '[N]': ['N', 2], '[=N]': ['=N', 2], '[C]': ['C', 3], '[=C]': ['=C', 2], '[#C]': ['=C', 2]},
+    
+    {'[F]': ['F', 0], '[=O]': ['=O', 0], '[#N]': ['#N', 0], '[O]': ['O', 1],
+     '[N]': ['N', 2], '[=N]': ['=N', 1], '[C]': ['C', 3], '[=C]': ['=C', 2], '[#C]': ['#C', 1]},
+    
+    {'[F]': ['F', 0], '[=O]': ['=O', 0], '[#N]': ['#N', 0], '[O]': ['O', 1],
+     '[N]': ['N', 2], '[=N]': ['=N', 1], '[C]': ['C', 3], '[=C]': ['=C', 2], '[#C]': ['#C', 1]}
+]
 
-X = [X0, X1, X2, X3, X4]
+# Función para quitar corchetes de una lista de tokens
+def remove_brackets(tokens):
+    return [token.replace('[', '').replace(']', '') for token in tokens]
 
-# Función para quitar corchetes
-def braketoff(lista):
-    return [el.replace('[', '').replace(']', '') for el in lista]
+# Inicialización
+chain = ''
+i = 1
+key = 0
+SELFIES = []
 
-# Encabezado de la app
-st.title('st_SELFIES 😎 (BETA)')
+# Primer token desde estado inicial
+dic = X[0]
+selected = st.sidebar.selectbox(f'token: {key}', dic, key=str(key))
+SELFIES.append(selected)
 
-# Inicialización de estado
-if 'SELFIES' not in st.session_state:
-    st.session_state.SELFIES = []
-    st.session_state.state = 0
-    st.session_state.token_count = 0
+# Construcción de la cadena SELFIES
+while i != 0:
+    key += 1
+    dic = X[i]
+    selected = st.sidebar.selectbox(f'token: {key}', dic, key=str(key))
+    SELFIES.append(selected)
+    i = int(dic[selected][1])
 
-# Mostrar el selector de token correspondiente al estado actual
-dic = X[st.session_state.state]
-token = st.sidebar.selectbox(f'Selecciona token ({st.session_state.token_count})', options=list(dic.keys()), key=f"token_{st.session_state.token_count}")
+    if i == 0:
+        # Se termina la cadena, convertir a SMILES y mostrar la molécula
+        final_tokens = remove_brackets(SELFIES)
+        st.title('st_SELFIES 😎 (BETA)')
+        st.write(SELFIES)
 
-# Botón para agregar token
-if st.sidebar.button("Agregar token"):
-    st.session_state.SELFIES.append(token)
-    st.session_state.state = int(dic[token][1])
-    st.session_state.token_count += 1
+        chain = ''.join(f'[{tok}]' for tok in final_tokens)
+        smiles = sf.decoder(chain)
+        mol = Chem.MolFromSmiles(smiles)
 
-# Mostrar SELFIES parcial
-st.subheader("Cadena SELFIES actual")
-st.write(st.session_state.SELFIES)
+        if mol:
+            img = Draw.MolToImage(mol)
+            st.image(img)
+        else:
+            st.error("No se pudo generar una molécula válida.")
 
-# Si se llegó al estado terminal (0), construir molécula
-if st.session_state.state == 0 and st.session_state.SELFIES:
-    final = braketoff(st.session_state.SELFIES)
-    chain = ''.join(f'[{f}]' for f in final)
-
-    st.subheader("SELFIES final:")
-    st.code(chain)
-
-    # Decodificación y visualización
-    smiles = sf.decoder(chain)
-    mol = Chem.MolFromSmiles(smiles)
-
-    if mol:
-        st.subheader("Molécula generada:")
-        img = Draw.MolToImage(mol)
-        st.image(img)
-    else:
-        st.error("No se pudo generar la molécula desde el SMILES generado.")
-
-# Botón para reiniciar todo
-if st.sidebar.button("Reiniciar"):
-    st.session_state.SELFIES = []
-    st.session_state.state = 0
-    st.session_state.token_count = 0
