@@ -1,63 +1,61 @@
 import streamlit as st
+import pandas as pd
 import selfies as sf
 from rdkit import Chem
 from rdkit.Chem import Draw
 from PIL import Image
 
-# Diccionarios de tokens válidos según la valencia restante
-X = [
-    {'[F]': ['F', 1], '[=O]': ['O', 2], '[#N]': ['N', 3], '[O]': ['O', 2],
-     '[N]': ['N', 3], '[=N]': ['N', 3], '[C]': ['C', 4], '[=C]': ['C', 4], '[#C]': ['C', 4]},
-    
-    {'[F]': ['F', 0], '[=O]': ['O', 0], '[#N]': ['N', 0], '[O]': ['O', 1],
-     '[N]': ['N', 2], '[=N]': ['N', 2], '[C]': ['C', 3], '[=C]': ['C', 3], '[#C]': ['C', 3]},
-    
-    {'[F]': ['F', 0], '[=O]': ['=O', 0], '[#N]': ['=N', 0], '[O]': ['O', 1],
-     '[N]': ['N', 2], '[=N]': ['=N', 2], '[C]': ['C', 3], '[=C]': ['=C', 2], '[#C]': ['=C', 2]},
-    
-    {'[F]': ['F', 0], '[=O]': ['=O', 0], '[#N]': ['#N', 0], '[O]': ['O', 1],
-     '[N]': ['N', 2], '[=N]': ['=N', 1], '[C]': ['C', 3], '[=C]': ['=C', 2], '[#C]': ['#C', 1]},
-    
-    {'[F]': ['F', 0], '[=O]': ['=O', 0], '[#N]': ['#N', 0], '[O]': ['O', 1],
-     '[N]': ['N', 2], '[=N]': ['=N', 1], '[C]': ['C', 3], '[=C]': ['=C', 2], '[#C]': ['#C', 1]}
-]
+# Cargar archivo CSV con la tabla de derivación
+df = pd.read_csv('selfies_table.csv')
 
-# Función para quitar corchetes de una lista de tokens
+# Construir diccionarios por estado
+X_dict = {
+    state: {
+        row['symbol']: [row['smiles'], int(row['next_state'])]
+        for _, row in group.iterrows()
+    }
+    for state, group in df.groupby('state')
+}
+
+# Lista de estados en orden
+states = ['X0', 'X1', 'X2', 'X3', 'X4']
+
+# Función para quitar corchetes
 def remove_brackets(tokens):
-    return [token.replace('[', '').replace(']', '') for token in tokens]
+    return [tok.replace('[', '').replace(']', '') for tok in tokens]
 
 # Inicialización
-chain = ''
-i = 1
-key = 0
 SELFIES = []
+chain = ''
+key = 0
+state_index = 0
 
-# Primer token desde estado inicial
-dic = X[0]
+# Primer token desde X0
+dic = X_dict[states[state_index]]
 selected = st.sidebar.selectbox(f'token: {key}', dic, key=str(key))
 SELFIES.append(selected)
 
-# Construcción de la cadena SELFIES
-while i != 0:
+# Construcción de cadena SELFIES
+next_state = int(dic[selected][1])
+
+while next_state != 0:
     key += 1
-    dic = X[i]
+    dic = X_dict[states[next_state]]
     selected = st.sidebar.selectbox(f'token: {key}', dic, key=str(key))
     SELFIES.append(selected)
-    i = int(dic[selected][1])
+    next_state = int(dic[selected][1])
 
-    if i == 0:
-        # Se termina la cadena, convertir a SMILES y mostrar la molécula
-        final_tokens = remove_brackets(SELFIES)
-        st.title('st_SELFIES 😎 (BETA)')
-        st.write(SELFIES)
+# Mostrar resultados
+final_tokens = remove_brackets(SELFIES)
+st.title('st_SELFIES 😎 (BETA)')
+st.write(SELFIES)
 
-        chain = ''.join(f'[{tok}]' for tok in final_tokens)
-        smiles = sf.decoder(chain)
-        mol = Chem.MolFromSmiles(smiles)
+chain = ''.join(f'[{tok}]' for tok in final_tokens)
+smiles = sf.decoder(chain)
+mol = Chem.MolFromSmiles(smiles)
 
-        if mol:
-            img = Draw.MolToImage(mol)
-            st.image(img)
-        else:
-            st.error("No se pudo generar una molécula válida.")
-
+if mol:
+    img = Draw.MolToImage(mol)
+    st.image(img)
+else:
+    st.error("No se pudo generar una molécula válida.")
