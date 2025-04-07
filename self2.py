@@ -6,7 +6,7 @@ from rdkit.Chem import Draw
 from PIL import Image
 
 # Cargar el archivo corregido
-df = pd.read_csv('selfies_table_corrected.csv')
+df = pd.read_csv('selfies_table_full_extended.csv')
 
 # Construir diccionario FSM
 X_dict = {
