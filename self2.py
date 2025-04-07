@@ -5,13 +5,13 @@ from rdkit import Chem
 from rdkit.Chem import Draw
 from PIL import Image
 
-# Cargar la tabla extendida
-df = pd.read_csv('selfies_table_extended_with_branches_and_rings.csv')
+# Cargar el archivo corregido
+df = pd.read_csv('selfies_table_corrected.csv')
 
-# Diccionarios por estado
+# Construir diccionario FSM
 X_dict = {
     state: {
-        row['symbol']: [row['smiles'], int(row['next_state'])]
+        row['symbol']: [row['smiles'], row['next_state']]
         for _, row in group.iterrows()
     }
     for state, group in df.groupby('state')
@@ -27,10 +27,11 @@ chain = ''
 key = 0
 state_index = 0
 
+# Primer token desde X0
 dic = X_dict[states[state_index]]
 selected = st.sidebar.selectbox(f'token: {key}', dic, key=str(key))
 SELFIES.append(selected)
-next_state = int(dic[selected][1])
+next_state = dic[selected][1]
 
 while next_state != 0:
     key += 1
@@ -48,11 +49,16 @@ while next_state != 0:
             branch_dic = X_dict[branch_state]
             branch_token = st.sidebar.selectbox(f'branch_token: {key}', branch_dic, key=str(key))
             SELFIES.append(branch_token)
-            branch_state = states[int(branch_dic[branch_token][1])]
-        next_state = int(dic[selected][1])  # continúa después de la rama
+            branch_state = states[branch_dic[branch_token][1]]
+        next_state = dic[selected][1]
+
+    # 🔁 Manejo de anillos
+    elif 'Ring' in selected:
+        # Agrega el símbolo sin cambiar de estado
+        next_state = dic[selected][1]  # permanece en el mismo estado
 
     else:
-        next_state = int(dic[selected][1])
+        next_state = dic[selected][1]
 
 # Visualización
 final_tokens = remove_brackets(SELFIES)
