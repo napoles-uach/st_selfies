@@ -4,78 +4,69 @@ from rdkit import Chem
 from rdkit.Chem import Draw
 from PIL import Image
 
-st.set_page_config(page_title="SELFIES Builder", layout="centered")
-
-st.title("☕ SELFIES Builder – Versión extendida estilo FSM")
-
-# --- Tabla de valencias extendida ---
-valencias = {
-    '[F]': 1, '[Cl]': 1, '[Br]': 1, '[I]': 1,
-    '[O]': 2, '[=O]': 2,
-    '[N]': 3, '[=N]': 3, '[#N]': 3, '[n]': 3,
-    '[C]': 4, '[=C]': 4, '[#C]': 4, '[c]': 3,
-    '[S]': 2, '[=S]': 2,
-    '[P]': 3, '[=P]': 3,
-    '[B]': 3, '[=B]': 3,
-    '[Branch1_1]': 0, '[Branch2_2]': 0,
-    '[Ring1]': 0, '[Ring2]': 0, '[Ring3]': 0,
-    '[Expl=Ring1]': 0, '[Expl=Ring2]': 0,
-    '[Expl#Ring1]': 0, '[Expl#Ring2]': 0,
-    '[nop]': 0
+# Agregamos enlaces dobles y triples y ramificaciones
+extra_tokens = {
+    '[Branch1_1]': ['B', 0],
+    '[Branch2_2]': ['B', 0],
+    '[Ring1]': ['R', 0],
+    '[Ring2]': ['R', 0]
 }
 
-# --- Construcción de estados X0 a X4 ---
-X = []
-for estado in range(5):
-    tabla_estado = {}
-    for token, valencia in valencias.items():
-        nueva_valencia = max(estado + valencia - 4, 0)
-        tabla_estado[token] = [token.strip("[]"), nueva_valencia]
-    X.append(tabla_estado)
+# Diccionarios base de valencia (puedes enriquecerlos después)
+X0 = {'[F]': ['F', 1], '[=O]': ['O', 2], '[#N]': ['N', 3], '[O]': ['O', 2],
+      '[N]': ['N', 3], '[=N]': ['N', 3], '[C]': ['C', 4], '[=C]': ['C', 4], '[#C]': ['C', 4]}
+X1 = {'[F]': ['F', 0], '[=O]': ['O', 0], '[#N]': ['N', 0], '[O]': ['O', 1],
+      '[N]': ['N', 2], '[=N]': ['N', 2], '[C]': ['C', 3], '[=C]': ['C', 3], '[#C]': ['C', 3]}
+X2 = {'[F]': ['F', 0], '[=O]': ['=O', 0], '[#N]': ['=N', 0], '[O]': ['O', 1],
+      '[N]': ['N', 2], '[=N]': ['=N', 2], '[C]': ['C', 3], '[=C]': ['=C', 2], '[#C]': ['=C', 2]}
+X3 = {'[F]': ['F', 0], '[=O]': ['=O', 0], '[#N]': ['#N', 0], '[O]': ['O', 1],
+      '[N]': ['N', 2], '[=N]': ['=N', 1], '[C]': ['C', 3], '[=C]': ['=C', 2], '[#C]': ['#C', 1]}
+X4 = {'[F]': ['F', 0], '[=O]': ['=O', 0], '[#N]': ['#N', 0], '[O]': ['O', 1],
+      '[N]': ['N', 2], '[=N]': ['=N', 1], '[C]': ['C', 3], '[=C]': ['=C', 2], '[#C]': ['#C', 1]}
+X = [X0, X1, X2, X3, X4]
 
-# --- Inicialización de sesión ---
+# Agregar extra_tokens a todos los diccionarios
+for xi in X:
+    xi.update(extra_tokens)
+
+# --- Estado inicial
 if "tokens" not in st.session_state:
     st.session_state.tokens = []
 if "state" not in st.session_state:
     st.session_state.state = 0
 
-# --- Diccionario actual según estado ---
-estado_actual = st.session_state.state
-diccionario_actual = X[estado_actual]
+st.title("🧬 SELFIES Builder - Versión extendida")
 
-# No permitir ramas ni ciclos como primer token
-if len(st.session_state.tokens) == 0:
-    diccionario_actual = {k: v for k, v in diccionario_actual.items() if 'Branch' not in k and 'Ring' not in k}
+# Diccionario actual
+current_dict = X[st.session_state.state]
 
-# --- Selección de token ---
-selected = st.selectbox("Selecciona el siguiente token:", sorted(diccionario_actual.keys()))
+# Selección de token
+selected = st.selectbox("Selecciona el siguiente token", current_dict.keys())
 
-# --- Agregar token ---
+# Agregar token
 if st.button("Agregar token"):
     st.session_state.tokens.append(selected)
-    st.session_state.state = int(diccionario_actual[selected][1])
+    st.session_state.state = int(current_dict[selected][1])
 
-# --- Mostrar SELFIES actual ---
+# Mostrar SELFIES actual
 if st.session_state.tokens:
-    st.subheader("📋 Cadena SELFIES actual:")
+    st.subheader("📋 Cadena SELFIES actual")
+    st.write(" ".join(st.session_state.tokens))
+
     chain = "".join(st.session_state.tokens)
-    st.code(chain)
 
-    # Intentar decodificar y mostrar estructura
+    # Si estado = 0, mol cerrada
     if st.session_state.state == 0:
-        try:
-            smiles = sf.decoder(chain)
-            st.success(f"SMILES generado: `{smiles}`")
-            mol = Chem.MolFromSmiles(smiles)
-            if mol:
-                img = Draw.MolToImage(mol, size=(300, 300))
-                st.image(img, caption="Estructura generada")
-            else:
-                st.warning("RDKit no pudo generar una molécula válida.")
-        except Exception as e:
-            st.error(f"Error al decodificar: {e}")
+        smiles = sf.decoder(chain)
+        st.success(f"SMILES: `{smiles}`")
+        mol = Chem.MolFromSmiles(smiles)
+        if mol:
+            img = Draw.MolToImage(mol, size=(300, 300))
+            st.image(img)
+        else:
+            st.error("Error al generar la molécula")
 
-# --- Botón para reiniciar ---
+# Reiniciar
 if st.button("🔄 Reiniciar construcción"):
     st.session_state.tokens = []
     st.session_state.state = 0
