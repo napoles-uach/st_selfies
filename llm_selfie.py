@@ -6,6 +6,7 @@ import selfies as sf
 from rdkit import Chem
 from rdkit.Chem import Draw
 from PIL import Image
+import re
 
 # --- Config ---
 HF_API_TOKEN = os.environ.get("HF_API_TOKEN", "YOUR_HF_API_TOKEN_HERE")
@@ -28,19 +29,39 @@ states = ['X0', 'X1', 'X2', 'X3', 'X4']
 # --- Prompt builder ---
 def build_selfies_prompt(current_state, options, current_chain, objective=None):
     base = f"""
-Estás construyendo una molécula usando SELFIES. Cada token depende del estado actual de valencia.
+Estás construyendo una molécula usando SELFIES. Cada token que elijas depende del estado actual de valencia.
 
 Estado actual: {current_state}
-SELFIES parcial: {' '.join(current_chain)}
+SELFIES parcial: {' '.join(current_chain) if current_chain else '(vacío)'}
 
-Tokens válidos desde este estado:
+Tokens válidos:
 {list(options.keys())}
 """
     if objective:
-        base += f"\nTu objetivo es: {objective}\n"
+        base += f"\nTu objetivo químico es: {objective}\n"
 
-    base += "\nElige el siguiente token SELFIES exacto. Devuelve solo el token, como por ejemplo: [C], [=O], [Branch1]."
+    base += """
+Elige el siguiente token SELFIES **exacto** de los disponibles. Responde en formato JSON:
+
+{
+  "token": "[C]"
+}
+
+Debe ser uno de los tokens válidos.
+"""
     return base
+
+# --- Extractor robusto ---
+def extract_token_from_response(response_text, valid_tokens):
+    try:
+        match = re.search(r'\{\s*"token"\s*:\s*"(.*?)"\s*\}', response_text)
+        if match:
+            token = match.group(1)
+            if token in valid_tokens:
+                return token
+    except:
+        pass
+    return None
 
 # --- Hugging Face API ---
 def query_hf_model(prompt):
@@ -76,12 +97,8 @@ if st.button("Construir molécula automáticamente"):
             st.markdown("**Respuesta completa:**")
             st.code(response_text)
 
-        # Intentar extraer un token válido
-        selected = None
-        for token in options:
-            if token in response_text:
-                selected = token
-                break
+        # Extraer token desde JSON
+        selected = extract_token_from_response(response_text, options.keys())
 
         if not selected:
             st.warning("No se encontró un token válido en la respuesta. Finalizando.")
