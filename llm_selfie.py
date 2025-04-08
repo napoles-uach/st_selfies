@@ -26,19 +26,21 @@ X_dict = {
 states = ['X0', 'X1', 'X2', 'X3', 'X4']
 
 # --- Prompt builder ---
-def build_selfies_prompt(current_state, options, current_chain):
-    return f"""
-Estás construyendo una molécula con SELFIES. Cada token que elijas depende del estado actual.
+def build_selfies_prompt(current_state, options, current_chain, objective=None):
+    base = f"""
+Estás construyendo una molécula usando SELFIES. Cada token depende del estado actual de valencia.
 
 Estado actual: {current_state}
 SELFIES parcial: {' '.join(current_chain)}
 
-Tokens válidos:
+Tokens válidos desde este estado:
 {list(options.keys())}
-
-Selecciona el siguiente token SELFIES exacto de la lista anterior.
-Devuelve solo el token, por ejemplo: [C], [=O], [Branch1], etc.
 """
+    if objective:
+        base += f"\nTu objetivo es: {objective}\n"
+
+    base += "\nElige el siguiente token SELFIES exacto. Devuelve solo el token, como por ejemplo: [C], [=O], [Branch1]."
+    return base
 
 # --- Hugging Face API ---
 def query_hf_model(prompt):
@@ -52,18 +54,27 @@ def query_hf_model(prompt):
 # --- App ---
 st.title("🤖 SELFIES Builder con Agente LLM")
 
+objective = st.text_input("🎯 Objetivo químico del agente (opcional)", "incluir un grupo carbonilo [=O] y un nitrógeno [N]")
+
 if st.button("Construir molécula automáticamente"):
     state = 'X0'
     selfies_chain = []
 
     while True:
         options = X_dict[state]
-        prompt = build_selfies_prompt(state, options, selfies_chain)
+        prompt = build_selfies_prompt(state, options, selfies_chain, objective)
         try:
             response_text = query_hf_model(prompt)
         except Exception as e:
             st.error(f"Error al consultar Hugging Face API: {e}")
             break
+
+        # Mostrar lo que "piensa" el modelo
+        with st.expander(f"🤖 Pensamiento del modelo en {state}"):
+            st.markdown("**Prompt enviado:**")
+            st.code(prompt)
+            st.markdown("**Respuesta completa:**")
+            st.code(response_text)
 
         # Intentar extraer un token válido
         selected = None
